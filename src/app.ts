@@ -41,7 +41,7 @@ app.use("/api/reviews/", reviewRoute);
 app.use("/api/payments/", paymentRoute);
 
 app.get("/", (req, res) => {
-  res.send("Server is running");
+  res.send("Fix Now Server is Running");
 });
 
 app.use(notFound);
