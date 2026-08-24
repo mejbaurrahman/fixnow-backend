@@ -6,6 +6,8 @@ model Service {
 
   description   String
 
+  img String?
+
   price         Float
 
   duration      Int
