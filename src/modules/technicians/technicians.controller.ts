@@ -27,7 +27,33 @@ const getTechnicianById = catchAsync(async (req: Request, res: Response) => {
     data: technician,
   });
 });
+
+export const getAvailability = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    const { date } = req.query;
+
+    if (!date) {
+      throw new Error("Date is required");
+    }
+
+    const result = await techniciansService.getAvailability(
+      id as string,
+      date as string,
+    );
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Availability retrieved successfully",
+
+      data: result,
+    });
+  },
+);
 export const techniciansController = {
   getAllTechnicians,
   getTechnicianById,
+  getAvailability,
 };

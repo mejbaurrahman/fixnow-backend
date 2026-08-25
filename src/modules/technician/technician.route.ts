@@ -10,6 +10,7 @@ router.put(
   auth(Role.TECHNICIAN),
   technicianController.updateAvailability,
 );
+
 router.put(
   "/profile",
   auth(Role.TECHNICIAN),

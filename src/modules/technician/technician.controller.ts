@@ -65,6 +65,7 @@ const updateBookingStatus = catchAsync(async (req: Request, res: Response) => {
     data: updatedBooking,
   });
 });
+
 export const technicianController = {
   updateProfile,
   updateAvailability,
