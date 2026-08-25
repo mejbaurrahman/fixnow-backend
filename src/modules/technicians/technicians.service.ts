@@ -11,6 +11,7 @@ const getAllTechniciansFromDB = async () => {
           availability: true,
         },
       },
+      services: true,
       reviewReceived: true,
     },
     omit: {
@@ -32,6 +33,7 @@ const getTechnicianByIdFromDB = async (id: string) => {
           availability: true,
         },
       },
+      services: true,
       reviewReceived: true,
     },
     omit: {
