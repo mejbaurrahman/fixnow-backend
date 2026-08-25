@@ -4,7 +4,11 @@ import { ITechnicianProfileUpdate } from "./technician.interface";
 
 const updateTechnicianAvailability = async (
   technicianId: string,
-  availability: any,
+  availability: {
+    date: string;
+    slots: string[];
+    isAvailable?: boolean;
+  },
 ) => {
   const technician = await prisma.user.findUnique({
     where: {
@@ -22,28 +26,36 @@ const updateTechnicianAvailability = async (
 
   const profileId = technician.technicianProfile.id;
 
-  const start = new Date(availability.startTime);
-  const end = new Date(availability.endTime);
+  const date = new Date(availability.date);
 
-  const existingSlot = await prisma.technicianAvailability.findFirst({
+  const existingAvailability = await prisma.technicianAvailability.findFirst({
     where: {
       technicianId: profileId,
-      startTime: start,
-      endTime: end,
+      date,
     },
   });
 
-  if (existingSlot) {
-    throw new Error("Availability slot already exists");
+  if (existingAvailability) {
+    const duplicateSlots = availability.slots.filter((slot) =>
+      existingAvailability.slots.includes(slot),
+    );
+
+    if (duplicateSlots.length > 0) {
+      throw new Error(
+        `These time slots already exist: ${duplicateSlots.join(", ")}`,
+      );
+    }
   }
+
   const newAvailability = await prisma.technicianAvailability.create({
     data: {
       technicianId: profileId,
-      startTime: start,
-      endTime: end,
-      isAvailable: availability?.isAvailable,
+      date,
+      slots: availability.slots,
+      isAvailable: availability.isAvailable ?? true,
     },
   });
+
   return newAvailability;
 };
 

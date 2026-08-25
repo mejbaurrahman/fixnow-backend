@@ -1,8 +1,8 @@
 model technicianAvailability {
   id           String   @id @default(uuid())
   technicianId String
-  startTime    DateTime
-  endTime      DateTime
+  date         DateTime?
+  slots        String[]
   isAvailable  Boolean  @default(true)
 
   technician TechnicianProfile @relation(fields: [technicianId], references: [id], onDelete: Cascade)

@@ -58,18 +58,95 @@ const createService = async (technicianId: string, payload: ICreateService) => {
   return service;
 };
 
+// const getAllServices = async (query: any) => {
+//   const { type, location, rating } = query;
+//   const services = await prisma.service.findMany({
+//     where: {
+//       ...(type && {
+//         categroy: {
+//           name: {
+//             contains: type,
+//             mode: "insensitive",
+//           },
+//         },
+//       }),
+//       ...(location && {
+//         technician: {
+//           technicianProfile: {
+//             location: {
+//               contains: location,
+//               mode: "insensitive",
+//             },
+//           },
+//         },
+//       }),
+//       ...(rating && {
+//         technician: {
+//           technicianProfile: {
+//             averageRating: {
+//               gte: parseFloat(rating),
+//             },
+//           },
+//         },
+//       }),
+//     },
+//     include: {
+//       technician: {
+//         select: {
+//           id: true,
+//           name: true,
+//           email: true,
+//           phone: true,
+//           role: true,
+//           technicianProfile: true,
+//         },
+//       },
+//       category: true,
+//     },
+//   });
+
+//   return services;
+// };
+
 const getAllServices = async (query: any) => {
-  const { type, location, rating } = query;
+  const { search, category, location, rating } = query;
+
   const services = await prisma.service.findMany({
     where: {
-      ...(type && {
-        categroy: {
+      ...(search && {
+        OR: [
+          {
+            title: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+          {
+            description: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+          {
+            category: {
+              name: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          },
+        ],
+      }),
+
+      ...(category && {
+        category: {
           name: {
-            contains: type,
+            contains: category,
             mode: "insensitive",
           },
         },
       }),
+
       ...(location && {
         technician: {
           technicianProfile: {
@@ -80,16 +157,18 @@ const getAllServices = async (query: any) => {
           },
         },
       }),
+
       ...(rating && {
         technician: {
           technicianProfile: {
-            averageRating: {
+            rating: {
               gte: parseFloat(rating),
             },
           },
         },
       }),
     },
+
     include: {
       technician: {
         select: {
@@ -101,13 +180,13 @@ const getAllServices = async (query: any) => {
           technicianProfile: true,
         },
       },
+
       category: true,
     },
   });
 
   return services;
 };
-
 export const serviceService = {
   createService,
   getAllServices,
