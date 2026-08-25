@@ -33,6 +33,7 @@ export const getAvailability = catchAsync(
     const { id } = req.params;
 
     const { date } = req.query;
+    console.log("id", id, "Date", date);
 
     if (!date) {
       throw new Error("Date is required");
