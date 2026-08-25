@@ -102,6 +102,7 @@ const updateTechnicianProfile = async (
       role: "TECHNICIAN",
     },
     include: {
+      services: true,
       technicianProfile: true,
     },
   });
