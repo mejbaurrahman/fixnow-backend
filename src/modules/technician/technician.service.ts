@@ -13,20 +13,36 @@ const updateTechnicianAvailability = async (
   const technician = await prisma.user.findUnique({
     where: {
       id: technicianId,
-      role: "TECHNICIAN",
     },
     include: {
       technicianProfile: true,
     },
   });
 
-  if (!technician?.technicianProfile) {
+  if (!technician || technician.role !== "TECHNICIAN") {
+    throw new Error("Technician not found");
+  }
+
+  if (!technician.technicianProfile) {
     throw new Error("Technician profile not found");
   }
 
   const profileId = technician.technicianProfile.id;
 
+  // 2. Validate date
   const date = new Date(availability.date);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Invalid availability date");
+  }
+
+  date.setUTCHours(0, 0, 0, 0);
+
+  if (!availability.slots || availability.slots.length === 0) {
+    throw new Error("At least one time slot is required");
+  }
+
+  const uniqueSlots = [...new Set(availability.slots)];
 
   const existingAvailability = await prisma.technicianAvailability.findFirst({
     where: {
@@ -35,8 +51,9 @@ const updateTechnicianAvailability = async (
     },
   });
 
+  // 5. If availability already exists, update it
   if (existingAvailability) {
-    const duplicateSlots = availability.slots.filter((slot) =>
+    const duplicateSlots = uniqueSlots.filter((slot) =>
       existingAvailability.slots.includes(slot),
     );
 
@@ -45,13 +62,29 @@ const updateTechnicianAvailability = async (
         `These time slots already exist: ${duplicateSlots.join(", ")}`,
       );
     }
+
+    const updatedAvailability = await prisma.technicianAvailability.update({
+      where: {
+        id: existingAvailability.id,
+      },
+      data: {
+        slots: [...existingAvailability.slots, ...uniqueSlots],
+
+        ...(availability.isAvailable !== undefined && {
+          isAvailable: availability.isAvailable,
+        }),
+      },
+    });
+
+    return updatedAvailability;
   }
 
+  // 6. Otherwise create new availability
   const newAvailability = await prisma.technicianAvailability.create({
     data: {
       technicianId: profileId,
       date,
-      slots: availability.slots,
+      slots: uniqueSlots,
       isAvailable: availability.isAvailable ?? true,
     },
   });
