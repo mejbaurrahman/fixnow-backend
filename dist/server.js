@@ -1225,9 +1225,59 @@ var getTechnicianByIdFromDB = async (id) => {
   });
   return technician;
 };
+var getAvailability = async (technicianId, date) => {
+  const technician = await prisma.user.findUnique({
+    where: {
+      id: technicianId,
+      role: "TECHNICIAN"
+    },
+    include: {
+      technicianProfile: true
+    }
+  });
+  if (!technician || !technician.technicianProfile) {
+    throw new Error("Technician not found");
+  }
+  const profileId = technician.technicianProfile.id;
+  const availabilityDate = new Date(date);
+  availabilityDate.setUTCHours(0, 0, 0, 0);
+  const availability = await prisma.technicianAvailability.findFirst({
+    where: {
+      technicianId: profileId,
+      date: availabilityDate,
+      isAvailable: true
+    },
+    include: {
+      booking: {
+        select: {
+          slot: true,
+          status: true
+        }
+      }
+    }
+  });
+  if (!availability) {
+    return {
+      availabilityId: null,
+      date,
+      slots: []
+    };
+  }
+  const bookedSlots = availability.booking.filter((book) => book.status !== "CANCELLED" && book.status !== "DECLINED").map((booking) => booking.slot);
+  const slots = availability.slots.map((slot) => ({
+    time: slot,
+    isBooked: bookedSlots.includes(slot)
+  }));
+  return {
+    availabilityId: availability.id,
+    date,
+    slots
+  };
+};
 var techniciansService = {
   getAllTechniciansFromDB,
-  getTechnicianByIdFromDB
+  getTechnicianByIdFromDB,
+  getAvailability
 };
 
 // src/modules/technicians/technicians.controller.ts
@@ -1252,15 +1302,37 @@ var getTechnicianById = catchAsync(async (req, res) => {
     data: technician
   });
 });
+var getAvailability2 = catchAsync(
+  async (req, res) => {
+    const { id } = req.params;
+    const { date } = req.query;
+    console.log("id", id, "Date", date);
+    if (!date) {
+      throw new Error("Date is required");
+    }
+    const result = await techniciansService.getAvailability(
+      id,
+      date
+    );
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Availability retrieved successfully",
+      data: result
+    });
+  }
+);
 var techniciansController = {
   getAllTechnicians,
-  getTechnicianById
+  getTechnicianById,
+  getAvailability: getAvailability2
 };
 
 // src/modules/technicians/technicians.route.ts
 var router6 = Router6();
 router6.get("/", techniciansController.getAllTechnicians);
 router6.get("/:id", techniciansController.getTechnicianById);
+router6.get("/:id/availability", techniciansController.getAvailability);
 var techniciansRoute = router6;
 
 // src/modules/technician/technician.route.ts
