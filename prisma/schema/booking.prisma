@@ -1,23 +1,19 @@
 model Booking {
 
-  id String @id @default(uuid())
+  id             String        @id @default(uuid())
+  customerId     String
+  technicianId   String
+  serviceId      String
+  bookingDate    DateTime
 
-  customerId String
+  slot           String
 
-  technicianId String
+  status         BookingStatus @default(REQUESTED)
+  totalAmount    Float
 
-  serviceId String
+  availabilityId String
 
-  bookingDate DateTime
-  
- 
-
-  status BookingStatus @default(REQUESTED)
-
-  totalAmount Float
-  availabilityId String @unique
-  note String?
-
+  note           String?
 
   createdAt DateTime @default(now())
 
@@ -33,7 +29,7 @@ model Booking {
   payment Payment?
 
   review Review?
-
+  @@unique([availabilityId, slot])
   @@index([customerId])
   @@index([technicianId])
   @@index([serviceId])

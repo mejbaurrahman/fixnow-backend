@@ -7,7 +7,7 @@ model technicianAvailability {
 
   technician TechnicianProfile @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
-  booking Booking?
+  booking Booking[]
   @@index([technicianId])
   @@map("technician_availabilities")
 }
