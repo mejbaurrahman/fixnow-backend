@@ -5,7 +5,11 @@ import httpStatus from "http-status";
 import { bookingService } from "./booking.service";
 
 const createBooking = async (req: Request, res: Response) => {
-  const result = await bookingService.createBooking(req.body);
+  const customerId = req.user?.id;
+  const result = await bookingService.createBooking(
+    customerId as string,
+    req.body,
+  );
 
   sendResponse(res, {
     success: true,

@@ -2,7 +2,7 @@ import { Prisma } from "../../../prisma/generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ICreateBooking } from "./booking.interface";
 
-const createBooking = async (payload: ICreateBooking) => {
+const createBooking = async (customerId: string, payload: ICreateBooking) => {
   // 1. Check service
 
   const service = await prisma.service.findUnique({
@@ -99,7 +99,7 @@ const createBooking = async (payload: ICreateBooking) => {
 
   const booking = await prisma.booking.create({
     data: {
-      customerId: payload.customerId,
+      customerId: customerId,
 
       technicianId: payload.technicianId,
 
