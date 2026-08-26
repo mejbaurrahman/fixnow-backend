@@ -2,15 +2,14 @@ import { Prisma } from "../../../prisma/generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ICreateBooking } from "./booking.interface";
 
-const createBooking = async (customerId: string, payload: ICreateBooking) => {
-  // ------------------------------------------------
+const createBooking = async (payload: ICreateBooking) => {
   // 1. Check service
-  // ------------------------------------------------
 
-  const checkService = await prisma.service.findUnique({
+  const service = await prisma.service.findUnique({
     where: {
       id: payload.serviceId,
     },
+
     include: {
       technician: {
         include: {
@@ -20,32 +19,23 @@ const createBooking = async (customerId: string, payload: ICreateBooking) => {
     },
   });
 
-  if (!checkService) {
+  if (!service) {
     throw new Error("Selected service does not exist");
   }
 
-  // payload.technicianId = User.id
-  if (checkService.technician?.id !== payload.technicianId) {
-    throw new Error(
-      "Selected service does not belong to the selected technician",
-    );
+  // 2. Check service belongs to technician
+
+  if (service.technician?.id !== payload.technicianId) {
+    throw new Error("Service does not belong to technician");
   }
 
-  // ------------------------------------------------
-  // 2. Get TechnicianProfile
-  // ------------------------------------------------
-
-  const technicianProfile = checkService.technician?.technicianProfile;
+  const technicianProfile = service.technician?.technicianProfile;
 
   if (!technicianProfile) {
     throw new Error("Technician profile not found");
   }
 
-  const technicianProfileId = technicianProfile.id;
-
-  // ------------------------------------------------
-  // 3. Get selected availability
-  // ------------------------------------------------
+  // 3. Check availability
 
   const availability = await prisma.technicianAvailability.findUnique({
     where: {
@@ -54,46 +44,20 @@ const createBooking = async (customerId: string, payload: ICreateBooking) => {
   });
 
   if (!availability) {
-    throw new Error("Selected availability does not exist");
+    throw new Error("Availability not found");
   }
 
-  // ------------------------------------------------
-  // 4. Check availability belongs to technician
-  // ------------------------------------------------
-
-  if (availability.technicianId !== technicianProfileId) {
-    throw new Error(
-      "Selected availability does not belong to the selected technician",
-    );
+  if (availability.technicianId !== technicianProfile.id) {
+    throw new Error("Availability does not belong to technician");
   }
 
-  // ------------------------------------------------
-  // 5. Check availability active
-  // ------------------------------------------------
-
-  if (!availability.isAvailable) {
-    throw new Error("Selected availability is not available");
-  }
-
-  // ------------------------------------------------
-  // 6. Validate selected slot
-  // ------------------------------------------------
-
-  if (!payload.slot) {
-    throw new Error("Time slot is required");
-  }
+  // 4. Validate slot
 
   if (!availability.slots.includes(payload.slot)) {
-    throw new Error("Selected time slot does not belong to this availability");
+    throw new Error("Invalid slot selected");
   }
 
-  // ------------------------------------------------
-  // 7. Check booking date
-  // ------------------------------------------------
-
-  if (!availability.date) {
-    throw new Error("Availability date not found");
-  }
+  // 5. Validate date
 
   const bookingDate = new Date(payload.bookingDate);
 
@@ -101,23 +65,24 @@ const createBooking = async (customerId: string, payload: ICreateBooking) => {
     throw new Error("Invalid booking date");
   }
 
-  const availabilityDate = new Date(availability.date);
+  if (availability.date) {
+    const availabilityDate = new Date(availability.date);
 
-  const requestedDateString = bookingDate.toISOString().split("T")[0];
+    const bookingDay = bookingDate.toISOString().split("T")[0];
 
-  const availabilityDateString = availabilityDate.toISOString().split("T")[0];
+    const availableDay = availabilityDate.toISOString().split("T")[0];
 
-  if (requestedDateString !== availabilityDateString) {
-    throw new Error("Booking date does not match the selected availability");
+    if (bookingDay !== availableDay) {
+      throw new Error("Booking date mismatch");
+    }
   }
 
-  // ------------------------------------------------
-  // 8. Check selected slot already booked
-  // ------------------------------------------------
+  // 6. Check duplicate booking
 
   const existingBooking = await prisma.booking.findFirst({
     where: {
       availabilityId: payload.availabilityId,
+
       slot: payload.slot,
 
       status: {
@@ -127,88 +92,46 @@ const createBooking = async (customerId: string, payload: ICreateBooking) => {
   });
 
   if (existingBooking) {
-    throw new Error("Selected time slot is already booked");
+    throw new Error("Slot already booked");
   }
 
-  // ------------------------------------------------
-  // 9. Get amount from SERVICE, not frontend
-  // ------------------------------------------------
+  // 7. Create booking
 
-  /*
-    Replace `price` with your actual Service price field.
+  const booking = await prisma.booking.create({
+    data: {
+      customerId: payload.customerId,
 
-    Example:
-    checkService.price
-    checkService.basePrice
-    checkService.serviceCharge
-  */
+      technicianId: payload.technicianId,
 
-  const totalAmount = checkService.price;
+      serviceId: payload.serviceId,
 
-  // ------------------------------------------------
-  // 10. Create booking
-  // ------------------------------------------------
+      availabilityId: payload.availabilityId,
 
-  try {
-    const booking = await prisma.booking.create({
-      data: {
-        customerId,
+      bookingDate,
 
-        // User.id
-        technicianId: payload.technicianId,
+      slot: payload.slot,
 
-        serviceId: payload.serviceId,
+      totalAmount: payload.totalAmount,
 
-        // technicianAvailability.id
-        availabilityId: payload.availabilityId,
+      note: payload.note || null,
 
-        bookingDate,
+      status: "REQUESTED",
+    },
 
-        slot: payload.slot,
+    include: {
+      customer: true,
 
-        totalAmount,
+      technician: true,
 
-        ...(payload.note && {
-          note: payload.note,
-        }),
+      service: true,
 
-        status: "REQUESTED",
-      },
+      availability: true,
+    },
+  });
 
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-
-        technician: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-
-        service: true,
-
-        availability: true,
-      },
-    });
-
-    return booking;
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      throw new Error("Selected time slot has already been booked");
-    }
-
-    throw error;
-  }
+  return booking;
 };
+
 const getMyBookings = async (customerId: string) => {
   const bookings = await prisma.booking.findMany({
     where: {

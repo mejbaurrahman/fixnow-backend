@@ -1,20 +1,22 @@
 import { BookingStatus } from "../../../prisma/generated/prisma/enums";
 
 export interface ICreateBooking {
+  customerId: string;
+
   technicianId: string;
+
   serviceId: string;
-
-  bookingDate: string;
-
-  availabilityId: string;
-
-  slot: string;
 
   totalAmount: number;
 
+  availabilityId: string;
+
+  bookingDate: string;
+
+  slot: string;
+
   note?: string;
 }
-
 export interface IBooking {
   id: string;
 
