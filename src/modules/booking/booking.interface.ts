@@ -1,8 +1,6 @@
 import { BookingStatus } from "../../../prisma/generated/prisma/enums";
 
 export interface ICreateBooking {
-  customerId: string;
-
   technicianId: string;
 
   serviceId: string;
@@ -39,3 +37,10 @@ export interface IBooking {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type ILggoedInUser = {
+  email: string;
+  name: string;
+  id: string;
+  role: "CUSTOMER" | "ADMIN" | "TECHNICIAN";
+};

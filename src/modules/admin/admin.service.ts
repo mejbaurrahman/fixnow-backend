@@ -52,6 +52,13 @@ const createCategory = async (payload: ICreateCategory) => {
     data: payload,
   });
 };
+const deleteCategory = async (payload: string) => {
+  return await prisma.category.delete({
+    where: {
+      id: payload,
+    },
+  });
+};
 
 export const adminService = {
   getAllUsers,
@@ -59,4 +66,5 @@ export const adminService = {
   getAllBookings,
   getAllCategories,
   createCategory,
+  deleteCategory,
 };

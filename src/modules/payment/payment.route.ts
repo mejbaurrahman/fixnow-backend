@@ -15,8 +15,12 @@ router.post(
   paymentController.confirmPayment,
 );
 
-router.get("/", auth(Role.CUSTOMER), paymentController.getPayments);
+router.get("/", auth(Role.CUSTOMER, Role.ADMIN), paymentController.getPayments);
 
-router.get("/:id", auth(Role.CUSTOMER), paymentController.getPaymentById);
+router.get(
+  "/:id",
+  auth(Role.CUSTOMER, Role.ADMIN),
+  paymentController.getPaymentById,
+);
 
 export const paymentRoute = router;

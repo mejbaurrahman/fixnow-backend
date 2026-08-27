@@ -60,6 +60,17 @@ const createCategory = async (req: Request, res: Response) => {
     data: result,
   });
 };
+const deleteCategory = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await adminService.deleteCategory(id as string);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.CREATED,
+    message: "Category deleted successfully",
+    data: result,
+  });
+};
 
 export const adminController = {
   getAllUsers,
@@ -67,4 +78,5 @@ export const adminController = {
   getAllBookings,
   getAllCategories,
   createCategory,
+  deleteCategory,
 };
