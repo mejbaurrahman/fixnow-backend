@@ -142,6 +142,11 @@ const getTechnicianBookings = async (technicianId: string) => {
     where: {
       technicianId,
     },
+    include: {
+      technician: true,
+      customer: true,
+      service: true,
+    },
   });
   return bookings;
 };

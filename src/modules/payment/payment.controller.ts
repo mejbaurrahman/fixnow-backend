@@ -33,7 +33,6 @@ const createPayment = catchAsync(async (req: Request, res: Response) => {
 
 const confirmPayment = catchAsync(async (req: Request, res: Response) => {
   const signature = req.headers["stripe-signature"];
-  console.log(signature, "signature");
   if (!signature) {
     return res.status(400).json({
       success: false,

@@ -4,6 +4,7 @@ import { stripe } from "../../lib/stripe";
 import { ICreatePayment } from "./payment.interface";
 
 const createPayment = async (userId: string, payload: ICreatePayment) => {
+  // console.log(payload);
   const booking = await prisma.booking.findFirst({
     where: {
       id: payload.bookingId,
@@ -90,6 +91,8 @@ const createPayment = async (userId: string, payload: ICreatePayment) => {
 const confirmPayment = async (rawBody: Buffer, signature: string) => {
   let event: Stripe.Event;
 
+  // console.log("In WEBHOOKS");
+
   try {
     event = stripe.webhooks.constructEvent(
       rawBody,
@@ -108,6 +111,7 @@ const confirmPayment = async (rawBody: Buffer, signature: string) => {
     if (!bookingId) {
       throw new Error("Booking ID not found in Stripe metadata");
     }
+
     const payment = await prisma.payment.findUnique({
       where: {
         bookingId,
@@ -121,66 +125,93 @@ const confirmPayment = async (rawBody: Buffer, signature: string) => {
     if (payment.status === "COMPLETED") {
       return {
         received: true,
+
         message: "Payment already completed",
       };
     }
 
     const paymentIntent = session.payment_intent;
 
-    await prisma.payment.update({
-      where: {
-        bookingId: bookingId,
-      },
+    await prisma.$transaction(async (tx) => {
+      // Update Payment
 
-      data: {
-        status: "COMPLETED",
-        paidAt: new Date(),
+      // Update Booking Status
+      try {
+        await tx.booking.update({
+          where: {
+            id: bookingId,
+          },
+          data: {
+            status: "PAID",
+            totalAmount: 2000,
+          },
+        });
+        await tx.payment.update({
+          where: {
+            bookingId,
+          },
 
-        stripeSessionId: session.id,
+          data: {
+            status: "COMPLETED",
 
-        stripePaymentIntentId:
-          typeof paymentIntent === "string" ? paymentIntent : null,
+            paidAt: new Date(),
 
-        transactionId: session.id,
-      },
+            stripeSessionId: session.id,
+
+            stripePaymentIntentId:
+              typeof paymentIntent === "string" ? paymentIntent : null,
+
+            transactionId: session.id,
+          },
+        });
+      } catch (error: any) {
+        throw new Error(error.message);
+      }
     });
   }
 
   if (event.type === "checkout.session.expired") {
     const session = event.data.object as Stripe.Checkout.Session;
+
     const bookingId = session.metadata?.bookingId;
 
     if (!bookingId) {
       throw new Error("Booking ID not found in Stripe metadata");
     }
+
     const payment = await prisma.payment.findUnique({
       where: {
         bookingId,
       },
     });
+
     if (!payment) {
       throw new Error("Payment record not found");
     }
+
     if (payment.status === "COMPLETED") {
       return {
         received: true,
+
         message: "Payment already completed",
       };
     }
+
     await prisma.payment.update({
       where: {
-        bookingId: bookingId,
+        bookingId,
       },
+
       data: {
         status: "FAILED",
       },
     });
   }
+
   return {
     received: true,
   };
 };
-
 const getPayments = async (userId: string) => {
   const payments = await prisma.payment.findMany({
     where: {

@@ -29,6 +29,19 @@ const createReview = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getReviews = catchAsync(async (req: Request, res: Response) => {
+  const reviews: any = await reviewService.getReviews();
+  if (!reviews) {
+    throw new Error("Reviews not retrived");
+  }
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: "Review retrived successfully",
+    data: reviews,
+  });
+});
 export const reviewController = {
   createReview,
+  getReviews,
 };

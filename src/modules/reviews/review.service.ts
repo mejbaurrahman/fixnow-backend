@@ -55,6 +55,17 @@ const createReview = async ({
   return review;
 };
 
+const getReviews = async () => {
+  const result = await prisma.review.findMany({
+    include: {
+      customer: true,
+      technician: true,
+      booking: true,
+    },
+  });
+  return result;
+};
 export const reviewService = {
   createReview,
+  getReviews,
 };
