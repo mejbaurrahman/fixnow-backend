@@ -666,12 +666,20 @@ var createCategory = async (payload) => {
     data: payload
   });
 };
+var deleteCategory = async (payload) => {
+  return await prisma.category.delete({
+    where: {
+      id: payload
+    }
+  });
+};
 var adminService = {
   getAllUsers,
   updateUserStatus,
   getAllBookings,
   getAllCategories,
-  createCategory
+  createCategory,
+  deleteCategory
 };
 
 // src/modules/admin/admin.controller.ts
@@ -723,12 +731,23 @@ var createCategory2 = async (req, res) => {
     data: result
   });
 };
+var deleteCategory2 = async (req, res) => {
+  const { id } = req.params;
+  const result = await adminService.deleteCategory(id);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus2.CREATED,
+    message: "Category deleted successfully",
+    data: result
+  });
+};
 var adminController = {
   getAllUsers: getAllUsers2,
   updateUserStatus: updateUserStatus2,
   getAllBookings: getAllBookings2,
   getAllCategories: getAllCategories2,
-  createCategory: createCategory2
+  createCategory: createCategory2,
+  deleteCategory: deleteCategory2
 };
 
 // src/modules/admin/admin.route.ts
@@ -738,6 +757,11 @@ router2.patch("/users/:id", auth(Role.ADMIN), adminController.updateUserStatus);
 router2.get("/bookings", auth(Role.ADMIN), adminController.getAllBookings);
 router2.get("/categories", auth(Role.ADMIN), adminController.getAllCategories);
 router2.post("/categories", auth(Role.ADMIN), adminController.createCategory);
+router2.delete(
+  "/categories/:id",
+  auth(Role.ADMIN),
+  adminController.deleteCategory
+);
 var adminRoute = router2;
 
 // src/modules/booking/booking.route.ts
@@ -747,7 +771,7 @@ import { Router as Router3 } from "express";
 import httpStatus3 from "http-status";
 
 // src/modules/booking/booking.service.ts
-var createBooking = async (payload) => {
+var createBooking = async (customerId, payload) => {
   const service = await prisma.service.findUnique({
     where: {
       id: payload.serviceId
@@ -810,7 +834,7 @@ var createBooking = async (payload) => {
   }
   const booking = await prisma.booking.create({
     data: {
-      customerId: payload.customerId,
+      customerId,
       technicianId: payload.technicianId,
       serviceId: payload.serviceId,
       availabilityId: payload.availabilityId,
@@ -891,7 +915,11 @@ var bookingService = {
 
 // src/modules/booking/booking.controller.ts
 var createBooking2 = async (req, res) => {
-  const result = await bookingService.createBooking(req.body);
+  const customerId = req.user?.id;
+  const result = await bookingService.createBooking(
+    customerId,
+    req.body
+  );
   sendResponse(res, {
     success: true,
     statusCode: httpStatus3.CREATED,
@@ -1402,6 +1430,11 @@ var getTechnicianBookings = async (technicianId) => {
   const bookings = await prisma.booking.findMany({
     where: {
       technicianId
+    },
+    include: {
+      technician: true,
+      customer: true,
+      service: true
     }
   });
   return bookings;
@@ -1572,8 +1605,19 @@ var createReview = async ({
   });
   return review;
 };
+var getReviews = async () => {
+  const result = await prisma.review.findMany({
+    include: {
+      customer: true,
+      technician: true,
+      booking: true
+    }
+  });
+  return result;
+};
 var reviewService = {
-  createReview
+  createReview,
+  getReviews
 };
 
 // src/modules/reviews/review.controller.ts
@@ -1596,13 +1640,27 @@ var createReview2 = catchAsync(async (req, res) => {
     data: review
   });
 });
+var getReviews2 = catchAsync(async (req, res) => {
+  const reviews = await reviewService.getReviews();
+  if (!reviews) {
+    throw new Error("Reviews not retrived");
+  }
+  sendResponse(res, {
+    statusCode: httpStatus7.CREATED,
+    success: true,
+    message: "Review retrived successfully",
+    data: reviews
+  });
+});
 var reviewController = {
-  createReview: createReview2
+  createReview: createReview2,
+  getReviews: getReviews2
 };
 
 // src/modules/reviews/review.route.ts
 var router8 = Router8();
 router8.post("/", auth(Role.CUSTOMER), reviewController.createReview);
+router8.get("/", reviewController.getReviews);
 var reviewRoute = router8;
 
 // src/modules/payment/payment.route.ts
@@ -1720,16 +1778,31 @@ var confirmPayment = async (rawBody, signature) => {
       };
     }
     const paymentIntent = session.payment_intent;
-    await prisma.payment.update({
-      where: {
-        bookingId
-      },
-      data: {
-        status: "COMPLETED",
-        paidAt: /* @__PURE__ */ new Date(),
-        stripeSessionId: session.id,
-        stripePaymentIntentId: typeof paymentIntent === "string" ? paymentIntent : null,
-        transactionId: session.id
+    await prisma.$transaction(async (tx) => {
+      try {
+        await tx.booking.update({
+          where: {
+            id: bookingId
+          },
+          data: {
+            status: "PAID",
+            totalAmount: 2e3
+          }
+        });
+        await tx.payment.update({
+          where: {
+            bookingId
+          },
+          data: {
+            status: "COMPLETED",
+            paidAt: /* @__PURE__ */ new Date(),
+            stripeSessionId: session.id,
+            stripePaymentIntentId: typeof paymentIntent === "string" ? paymentIntent : null,
+            transactionId: session.id
+          }
+        });
+      } catch (error) {
+        throw new Error(error.message);
       }
     });
   }
@@ -1854,7 +1927,6 @@ var createPayment2 = catchAsync(async (req, res) => {
 });
 var confirmPayment2 = catchAsync(async (req, res) => {
   const signature = req.headers["stripe-signature"];
-  console.log(signature, "signature");
   if (!signature) {
     return res.status(400).json({
       success: false,
@@ -1904,15 +1976,13 @@ var paymentController = {
 // src/modules/payment/payment.route.ts
 var router9 = express.Router();
 router9.post("/create", auth(Role.CUSTOMER), paymentController.createPayment);
-router9.post(
-  "/confirm",
-  express.raw({
-    type: "application/json"
-  }),
-  paymentController.confirmPayment
+router9.post("/confirm", paymentController.confirmPayment);
+router9.get("/", auth(Role.CUSTOMER, Role.ADMIN), paymentController.getPayments);
+router9.get(
+  "/:id",
+  auth(Role.CUSTOMER, Role.ADMIN),
+  paymentController.getPaymentById
 );
-router9.get("/", auth(Role.CUSTOMER), paymentController.getPayments);
-router9.get("/:id", auth(Role.CUSTOMER), paymentController.getPaymentById);
 var paymentRoute = router9;
 
 // src/middlewares/globalErrorHandler.ts
@@ -1969,6 +2039,12 @@ app.use(
   cors({
     origin: process.env.APP_URL,
     credentials: true
+  })
+);
+app.use(
+  "/api/payments/confirm",
+  express2.raw({
+    type: "application/json"
   })
 );
 app.use(express2.json());

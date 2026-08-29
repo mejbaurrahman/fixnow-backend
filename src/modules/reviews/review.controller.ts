@@ -37,7 +37,7 @@ const getReviews = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
-    message: "Review retrived successfully",
+    message: "Reviews retrived successfully",
     data: reviews,
   });
 });
